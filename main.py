@@ -90,7 +90,7 @@ def train(epoch):
         optim_gen.step()
 
         if batch_idx % 100 == 0:
-            print('disc loss', disc_loss.data[0], 'gen loss', gen_loss.data[0])
+            print('disc loss', disc_loss.item(), 'gen loss', gen_loss.item())
     scheduler_d.step()
     scheduler_g.step()
 

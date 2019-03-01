@@ -12,11 +12,12 @@ def l2normalize(v, eps=1e-12):
 
 
 class SpectralNorm(nn.Module):
-    def __init__(self, module, name='weight', power_iterations=1):
+    def __init__(self, module, name='weight', power_iterations=1, scaling_coefficient=.9):
         super(SpectralNorm, self).__init__()
         self.module = module
         self.name = name
         self.power_iterations = power_iterations
+        self.scaling_coefficient = scaling_coefficient
         if not self._made_params():
             self._make_params()
 
@@ -32,7 +33,14 @@ class SpectralNorm(nn.Module):
 
         # sigma = torch.dot(u.data, torch.mv(w.view(height,-1).data, v.data))
         sigma = u.dot(w.view(height, -1).mv(v))
-        setattr(self.module, self.name, w / sigma.expand_as(w))
+
+        # following Behrmann 2019, only update w when sigma > c
+
+        if sigma > self.scaling_coefficient:
+            setattr(self.module, self.name, Parameter(self.scaling_coefficient * w / sigma.expand_as(w)))
+        else:
+            setattr(self.module, self.name, Parameter(w))
+
 
     def _made_params(self):
         try:

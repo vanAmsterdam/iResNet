@@ -10,21 +10,28 @@ channels = 3
 
 class ResBlockGenerator(nn.Module):
 
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, in_channels, out_channels, stride=1, activation="ELU"):
         super(ResBlockGenerator, self).__init__()
 
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3, 1, padding=1)
         self.conv2 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
-        nn.init.xavier_uniform(self.conv1.weight.data, 1.)
-        nn.init.xavier_uniform(self.conv2.weight.data, 1.)
+        nn.init.xavier_uniform_(self.conv1.weight.data, 1.)
+        nn.init.xavier_uniform_(self.conv2.weight.data, 1.)
+
+        if activation == "ELU":
+            Activation = nn.ELU
+        elif activation == "ReLU":
+            Activation = nn.ReLU
+        else:
+            NotImplementedError("now only implemented for ELU or ReLU")
 
         self.model = nn.Sequential(
             nn.BatchNorm2d(in_channels),
-            nn.ReLU(),
+            Activation(),
             nn.Upsample(scale_factor=2),
             self.conv1,
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(),
+            Activation(),
             self.conv2
             )
         self.bypass = nn.Sequential()
@@ -37,26 +44,35 @@ class ResBlockGenerator(nn.Module):
 
 class ResBlockDiscriminator(nn.Module):
 
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, in_channels, out_channels, stride=1, activation="ELU"):
         super(ResBlockDiscriminator, self).__init__()
 
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3, 1, padding=1)
         self.conv2 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
-        nn.init.xavier_uniform(self.conv1.weight.data, 1.)
-        nn.init.xavier_uniform(self.conv2.weight.data, 1.)
+        nn.init.xavier_uniform_(self.conv1.weight.data, 1.)
+        nn.init.xavier_uniform_(self.conv2.weight.data, 1.)
+
+        if activation == "ELU":
+            Activation = nn.ELU
+        elif activation == "ReLU":
+            Activation = nn.ReLU
+        else:
+            NotImplementedError("now only implemented for ELU or ReLU")
+
+
 
         if stride == 1:
             self.model = nn.Sequential(
-                nn.ReLU(),
+                Activation(),
                 SpectralNorm(self.conv1),
-                nn.ReLU(),
+                Activation(),
                 SpectralNorm(self.conv2)
                 )
         else:
             self.model = nn.Sequential(
-                nn.ReLU(),
+                Activation(),
                 SpectralNorm(self.conv1),
-                nn.ReLU(),
+                Activation(),
                 SpectralNorm(self.conv2),
                 nn.AvgPool2d(2, stride=stride, padding=0)
                 )
@@ -64,7 +80,7 @@ class ResBlockDiscriminator(nn.Module):
         if stride != 1:
 
             self.bypass_conv = nn.Conv2d(in_channels,out_channels, 1, 1, padding=0)
-            nn.init.xavier_uniform(self.bypass_conv.weight.data, np.sqrt(2))
+            nn.init.xavier_uniform_(self.bypass_conv.weight.data, np.sqrt(2))
 
             self.bypass = nn.Sequential(
                 SpectralNorm(self.bypass_conv),
@@ -85,20 +101,27 @@ class ResBlockDiscriminator(nn.Module):
 # special ResBlock just for the first layer of the discriminator
 class FirstResBlockDiscriminator(nn.Module):
 
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, in_channels, out_channels, stride=1, activation="ELU"):
         super(FirstResBlockDiscriminator, self).__init__()
 
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3, 1, padding=1)
         self.conv2 = nn.Conv2d(out_channels, out_channels, 3, 1, padding=1)
         self.bypass_conv = nn.Conv2d(in_channels, out_channels, 1, 1, padding=0)
-        nn.init.xavier_uniform(self.conv1.weight.data, 1.)
-        nn.init.xavier_uniform(self.conv2.weight.data, 1.)
-        nn.init.xavier_uniform(self.bypass_conv.weight.data, np.sqrt(2))
+        nn.init.xavier_uniform_(self.conv1.weight.data, 1.)
+        nn.init.xavier_uniform_(self.conv2.weight.data, 1.)
+        nn.init.xavier_uniform_(self.bypass_conv.weight.data, np.sqrt(2))
+
+        if activation == "ELU":
+            Activation = nn.ELU
+        elif activation == "ReLU":
+            Activation = nn.ReLU
+        else:
+            NotImplementedError("now only implemented for ELU or ReLU")
 
         # we don't want to apply ReLU activation to raw image before convolution transformation.
         self.model = nn.Sequential(
             SpectralNorm(self.conv1),
-            nn.ReLU(),
+            Activation(),
             SpectralNorm(self.conv2),
             nn.AvgPool2d(2)
             )
@@ -114,21 +137,28 @@ GEN_SIZE=128
 DISC_SIZE=128
 
 class Generator(nn.Module):
-    def __init__(self, z_dim):
+    def __init__(self, z_dim, activation="ELU"):
         super(Generator, self).__init__()
         self.z_dim = z_dim
 
         self.dense = nn.Linear(self.z_dim, 4 * 4 * GEN_SIZE)
         self.final = nn.Conv2d(GEN_SIZE, channels, 3, stride=1, padding=1)
-        nn.init.xavier_uniform(self.dense.weight.data, 1.)
-        nn.init.xavier_uniform(self.final.weight.data, 1.)
+        nn.init.xavier_uniform_(self.dense.weight.data, 1.)
+        nn.init.xavier_uniform_(self.final.weight.data, 1.)
+
+        if activation == "ELU":
+            Activation = nn.ELU
+        elif activation == "ReLU":
+            Activation = nn.ReLU
+        else:
+            NotImplementedError("now only implemented for ELU or ReLU")
 
         self.model = nn.Sequential(
             ResBlockGenerator(GEN_SIZE, GEN_SIZE, stride=2),
             ResBlockGenerator(GEN_SIZE, GEN_SIZE, stride=2),
             ResBlockGenerator(GEN_SIZE, GEN_SIZE, stride=2),
             nn.BatchNorm2d(GEN_SIZE),
-            nn.ReLU(),
+            Activation(),
             self.final,
             nn.Tanh())
 
@@ -136,19 +166,26 @@ class Generator(nn.Module):
         return self.model(self.dense(z).view(-1, GEN_SIZE, 4, 4))
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, activation="ELU"):
         super(Discriminator, self).__init__()
+
+        if activation == "ELU":
+            Activation = nn.ELU
+        elif activation == "ReLU":
+            Activation = nn.ReLU
+        else:
+            NotImplementedError("now only implemented for ELU or ReLU")
 
         self.model = nn.Sequential(
                 FirstResBlockDiscriminator(channels, DISC_SIZE, stride=2),
                 ResBlockDiscriminator(DISC_SIZE, DISC_SIZE, stride=2),
                 ResBlockDiscriminator(DISC_SIZE, DISC_SIZE),
                 ResBlockDiscriminator(DISC_SIZE, DISC_SIZE),
-                nn.ReLU(),
+                Activation(),
                 nn.AvgPool2d(8),
             )
         self.fc = nn.Linear(DISC_SIZE, 1)
-        nn.init.xavier_uniform(self.fc.weight.data, 1.)
+        nn.init.xavier_uniform_(self.fc.weight.data, 1.)
         self.fc = SpectralNorm(self.fc)
 
     def forward(self, x):
